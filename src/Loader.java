@@ -1,45 +1,34 @@
-import java.io.FileOutputStream;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
-public class Loader
-{
-    public static void main(String[] args) throws Exception
-    {
+public class Loader {
+    public static void main(String[] args) throws Exception {
         long start = System.currentTimeMillis();
+        ExecutorService service = Executors.newFixedThreadPool(5);
 
-        FileOutputStream writer = new FileOutputStream("res/numbers.txt");
-
-        char letters[] = {'У', 'К', 'Е', 'Н', 'Х', 'В', 'А', 'Р', 'О', 'С', 'М', 'Т'};
-        for(int number = 1; number < 1000; number++)
-        {
-            int regionCode = 199;
-            for (char firstLetter : letters)
-            {
-                for (char secondLetter : letters)
-                {
-                    for (char thirdLetter : letters)
-                    {
-                        String carNumber = firstLetter + padNumber(number, 3) +
-                            secondLetter + thirdLetter + padNumber(regionCode, 2);
-                        writer.write(carNumber.getBytes());
-                        writer.write('\n');
-                    }
-                }
+        Set<Future<?>> futureList = new HashSet<>();
+        //Разделим задачу на 4 потока, каждому потоку выделим по 20 регионов
+        for (int i = 1, startRegionCode = 1; i <= 5; i++, startRegionCode += 20) {
+            futureList.add(
+                    service.submit(
+                            new Generator(startRegionCode, i * 20, i)
+                    )
+            );
+        }
+        futureList.forEach(future -> {
+            try {
+                future.get();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
             }
-        }
-
-        writer.flush();
-        writer.close();
-
+        });
+        service.shutdown();
         System.out.println((System.currentTimeMillis() - start) + " ms");
-    }
-
-    private static String padNumber(int number, int numberLength)
-    {
-        String numberStr = Integer.toString(number);
-        int padSize = numberLength - numberStr.length();
-        for(int i = 0; i < padSize; i++) {
-            numberStr = '0' + numberStr;
-        }
-        return numberStr;
     }
 }
