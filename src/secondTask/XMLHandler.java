@@ -1,7 +1,6 @@
 package secondTask;
 
 import org.xml.sax.Attributes;
-import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import java.text.SimpleDateFormat;
@@ -12,7 +11,11 @@ import java.util.Map;
 public class XMLHandler extends DefaultHandler {
     private Voter voter;
     private static SimpleDateFormat birthDayFormat = new SimpleDateFormat("yyyy.MM.dd");
-    private Map<Voter, Integer> voterCounts;
+    //Поменяем тип значения в Map с Integer на Byte, вряд ли один избиратель будет голосовать более 127 раз...
+    //Так же нет смысла хранить целый объект Voter как ключ, легковеснее будет хранить Voter, приведённый к String
+    //Чтобы сразу его потом печатать
+//    private Map<Voter, Integer> voterCounts; - было так
+    private Map<String, Byte> voterCounts;
 
     public XMLHandler() {
         voterCounts = new HashMap<>();
@@ -25,8 +28,9 @@ public class XMLHandler extends DefaultHandler {
                 Date birthDay = birthDayFormat.parse(attributes.getValue("birthDay"));
                 voter = new Voter(attributes.getValue("name"), birthDay);
             } else if (qName.equals("visit") && voter != null) {
-                int counts = voterCounts.getOrDefault(voter, 0);
-                voterCounts.put(voter, counts + 1);
+                //Ниже вставляем в Map уже объекты типа String и Byte
+                byte counts = voterCounts.getOrDefault(voter.toString(), (byte) 0); //counts тоже byte
+                voterCounts.put(voter.toString(), (byte) (counts + 1));
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -34,17 +38,19 @@ public class XMLHandler extends DefaultHandler {
     }
 
     @Override
-    public void endElement(String uri, String localName, String qName) throws SAXException {
+    public void endElement(String uri, String localName, String qName) {
         if (qName.equals("voter")) {
             voter = null;
         }
     }
 
     public void printDuplicatedVoters() {
-        for (Voter voter: voterCounts.keySet()) {
-            int count = voterCounts.get(voter);
+        //Соответственно тут пробегаемся уже по объектам String, а не Voter
+        for (String voter : voterCounts.keySet()) {
+            //count тоже изменим с int на byte
+            byte count = voterCounts.get(voter);
             if (count > 1) {
-                System.out.println(voter.toString() + " - " + count);
+                System.out.println(voter + " - " + count);
             }
         }
     }

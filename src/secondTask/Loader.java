@@ -18,11 +18,16 @@ public class Loader {
     private static SimpleDateFormat birthDayFormat = new SimpleDateFormat("yyyy.MM.dd");
     private static SimpleDateFormat visitDateFormat = new SimpleDateFormat("yyyy.MM.dd HH:mm:ss");
 
-    private static HashMap<Integer, WorkTime> voteStationWorkTimes = new HashMap<>();
-    private static HashMap<Voter, Integer> voterCounts = new HashMap<>();
+    //Тут можно поменять Integer на Short для экономии памяти
+    private static HashMap<Short, WorkTime> voteStationWorkTimes = new HashMap<>();
+    //Поменяем тип значения в Map с Integer на Byte, вряд ли один избиратель будет голосовать более 127 раз...
+    //Так же нет смысла хранить целый объект Voter как ключ, легковеснее будет хранить Voter, приведённый к String
+    //Чтобы сразу его потом печатать, то же самое сделаем в XMLHandler
+    private static HashMap<String, Byte> voterCounts = new HashMap<>();
 
     public static void main(String[] args) throws Exception {
-        long start = System.currentTimeMillis();
+        long memoryUsage = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        System.out.println("Memory usage on start: " + memoryUsage/1024 + " kb");
         String fileName = "res/data-18M.xml";
 
         SAXParserFactory factory = SAXParserFactory.newInstance();
@@ -31,34 +36,40 @@ public class Loader {
         parser.parse(new File(fileName), handler);
         handler.printDuplicatedVoters();
 
-//        parseFile(fileName);
+        memoryUsage = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() - memoryUsage;
+        System.out.println("Memory usage with SAX parser: " + memoryUsage/1024 + " kb");
+        memoryUsage = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        parseFile(fileName);
 
-        //Printing results
-//        System.out.println("Voting station work times: ");
-//        for (Integer votingStation : voteStationWorkTimes.keySet()) {
-//            WorkTime workTime = voteStationWorkTimes.get(votingStation);
-//            System.out.println("\t" + votingStation + " - " + workTime);
-//        }
-//
-//        System.out.println("Duplicated voters: ");
-//        for (Voter voter : voterCounts.keySet()) {
-//            Integer count = voterCounts.get(voter);
-//            if (count > 1) {
-//                System.out.println("\t" + voter + " - " + count);
-//            }
-//        }
-        System.out.println("Work time: " + (System.currentTimeMillis() - start) + " ms");
+//        Printing results
+        System.out.println("Voting station work times: ");
+        //ниже тоже поменяем Integer на short у итератора
+        for (short votingStation : voteStationWorkTimes.keySet()) {
+            WorkTime workTime = voteStationWorkTimes.get(votingStation);
+            System.out.println("\t" + votingStation + " - " + workTime);
+        }
+
+        System.out.println("Duplicated voters: ");
+        for (String voter : voterCounts.keySet()) { //Тут будем перебирать String, а не Voter
+            //Тут тип был Integer, переделаем на byte
+            byte count = voterCounts.get(voter);
+            if (count > 1) {
+                System.out.println("\t" + voter + " - " + count);
+            }
+        }
+        memoryUsage = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() - memoryUsage;
+        System.out.println("Memory usage with DOM parser: " + memoryUsage/1024 + " kb");
     }
 
-//    private static void parseFile(String fileName) throws Exception
-//    {
-//        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
-//        DocumentBuilder db = dbf.newDocumentBuilder();
-//        Document doc = db.parse(new File(fileName));
-//
-//        findEqualVoters(doc);
-//        fixWorkTimes(doc);
-//    }
+    private static void parseFile(String fileName) throws Exception
+    {
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        DocumentBuilder db = dbf.newDocumentBuilder();
+        Document doc = db.parse(new File(fileName));
+
+        findEqualVoters(doc);
+        fixWorkTimes(doc);
+    }
 
     private static void findEqualVoters(Document doc) throws Exception {
         NodeList voters = doc.getElementsByTagName("voter");
@@ -71,8 +82,10 @@ public class Loader {
             Date birthDay = birthDayFormat.parse(attributes.getNamedItem("birthDay").getNodeValue());
 
             Voter voter = new Voter(name, birthDay);
-            Integer count = voterCounts.get(voter);
-            voterCounts.put(voter, count == null ? 1 : count + 1);
+            //Тут count тоже был Integer, тоже переделаем на byte и съэкономим память
+//            Integer count = voterCounts.get(voter); - было так
+            byte count = voterCounts.getOrDefault(voter.toString(), (byte) 0);
+            voterCounts.put(voter.toString(), (byte) (count == 0  ? 1 : count + 1));
         }
     }
 
@@ -83,7 +96,8 @@ public class Loader {
             Node node = visits.item(i);
             NamedNodeMap attributes = node.getAttributes();
 
-            Integer station = Integer.parseInt(attributes.getNamedItem("station").getNodeValue());
+            //Тут Integer можно заменить на short, byte не подходит, т.к. есть номера станций с номером более 127
+            short station = Short.parseShort(attributes.getNamedItem("station").getNodeValue());
             Date time = visitDateFormat.parse(attributes.getNamedItem("time").getNodeValue());
             WorkTime workTime = voteStationWorkTimes.get(station);
             if (workTime == null) {
