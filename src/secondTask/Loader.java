@@ -22,7 +22,8 @@ public class Loader
 
     public static void main(String[] args) throws Exception
     {
-        String fileName = "res/data-1M.xml";
+        long start = System.currentTimeMillis();
+        String fileName = "res/data-18M.xml";
 
         parseFile(fileName);
 
@@ -42,6 +43,7 @@ public class Loader
                 System.out.println("\t" + voter + " - " + count);
             }
         }
+        System.out.println("Work time: " + (System.currentTimeMillis() - start) + " ms");
     }
 
     private static void parseFile(String fileName) throws Exception
