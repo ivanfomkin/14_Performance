@@ -1,6 +1,9 @@
 package thirdTask;
 
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class DBConnection {
     private static Connection connection;
@@ -8,6 +11,8 @@ public class DBConnection {
     private static String dbName = "skillbox";
     private static String dbUser = "root";
     private static String dbPass = "testtest";
+
+    private static StringBuilder insertQuery = new StringBuilder();
 
     public static Connection getConnection() {
         if (connection == null) {
@@ -21,8 +26,9 @@ public class DBConnection {
                         "name TINYTEXT NOT NULL, " +
                         "birthDate DATE NOT NULL, " +
                         "`count` INT NOT NULL, " +
-                        "PRIMARY KEY(id)," +
-                        "UNIQUE KEY name_date(name(50), birthDate))");
+                        "PRIMARY KEY(id), " +
+                        "KEY(name(50)));");
+//                        "UNIQUE KEY name_date(name(50), birthDate))");
             } catch (SQLException e) {
                 e.printStackTrace();
             }
@@ -30,12 +36,20 @@ public class DBConnection {
         return connection;
     }
 
+    public static void executeMultiInsert() throws SQLException {
+        insertQuery.insert(0, "INSERT INTO voter_count(name, birthDate, count) VALUES");
+        insertQuery.append(" ON DUPLICATE KEY UPDATE `count`=count+1");
+        DBConnection.getConnection().createStatement().execute(insertQuery.toString());
+        insertQuery.setLength(0); //Очистим билдер после insert-запроса
+    }
+
     public static void countVoter(String name, String birthDay) throws SQLException {
         birthDay = birthDay.replace('.', '-');
-        String sql = "INSERT INTO voter_count(name, birthDate, `count`) VALUES ('" + name +
-                "', '" + birthDay + "', 1)" +
-                "ON DUPLICATE KEY UPDATE count = count + 1";
-        DBConnection.getConnection().createStatement().execute(sql);
+        boolean isStart = insertQuery.length() == 0;
+        insertQuery.append((isStart ? "" : ",") + "('" + name + "', '" + birthDay + "', 1)");
+        if (insertQuery.length() > 2_140_000) { //Будем делать Multi Insert, если размер StringBuilder больше 2_140_000
+            executeMultiInsert();
+        }
     }
 
     public static void printVoterCounts() throws SQLException {
