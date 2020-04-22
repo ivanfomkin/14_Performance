@@ -19,7 +19,7 @@ public class DBConnection {
     private static String dbUser = "root";
     private static String dbPass = "testtest";
 
-    private static StringBuffer insertQuery = new StringBuffer();
+    private static StringBuilder insertQuery = new StringBuilder();
 
     public static Connection getConnection() {
         if (connection == null) {
