@@ -15,7 +15,6 @@ public class Loader {
         XMLHandler handler = new XMLHandler();
         parser.parse(new File(fileName), handler);
         DBConnection.executeMultiInsert(); //Выполним insert того, что осталось в StringBuilder
-
         System.out.println("Time: " + (System.currentTimeMillis() - start) / 1000 / 60 + " minutes");
     }
 }

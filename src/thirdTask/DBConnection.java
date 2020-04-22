@@ -1,9 +1,16 @@
 package thirdTask;
 
+import java.io.BufferedReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class DBConnection {
     private static Connection connection;
@@ -12,7 +19,7 @@ public class DBConnection {
     private static String dbUser = "root";
     private static String dbPass = "testtest";
 
-    private static StringBuilder insertQuery = new StringBuilder();
+    private static StringBuffer insertQuery = new StringBuffer();
 
     public static Connection getConnection() {
         if (connection == null) {
@@ -36,17 +43,38 @@ public class DBConnection {
         return connection;
     }
 
-    public static void executeMultiInsert() throws SQLException {
+    public static void executeMultiInsert() throws SQLException, InterruptedException, ExecutionException {
         insertQuery.insert(0, "INSERT INTO voter_count(name, birthDate, count) VALUES");
         insertQuery.append(" ON DUPLICATE KEY UPDATE `count`=count+1");
-        DBConnection.getConnection().createStatement().execute(insertQuery.toString());
-        insertQuery.setLength(0); //Очистим билдер после insert-запроса
+        Set<Future<?>> futures = new HashSet<>();
+        ExecutorService service = Executors.newSingleThreadExecutor();
+        futures.add(service.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    DBConnection.getConnection().createStatement().execute(insertQuery.toString());
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }));
+        futures.forEach(future -> {
+            try {
+                future.get();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            }
+        });
+        insertQuery.setLength(0); //Очистим билдер
+        service.shutdown();
     }
 
-    public static void countVoter(String name, String birthDay) throws SQLException {
+    public static void countVoter(String name, String birthDay) throws SQLException, ExecutionException, InterruptedException {
         birthDay = birthDay.replace('.', '-');
         boolean isStart = insertQuery.length() == 0;
-        insertQuery.append((isStart ? "" : ",") + "('" + name + "', '" + birthDay + "', 1)");
+        insertQuery.append(isStart ? "" : ",").append("('").append(name).append("', '").append(birthDay).append("', 1)");
         if (insertQuery.length() > 2_140_000) { //Будем делать Multi Insert, если размер StringBuilder больше 2_140_000
             executeMultiInsert();
         }
